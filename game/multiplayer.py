@@ -61,7 +61,7 @@ class Client(ConnectionListener):
         exit()
 
 if __name__ == '__main__':
-    c = Client('localhost', 31425)
+    c = Client('wwiipacifront.herokuapp.com', 31425)
     while 1:
         c.Loop()
         sleep(0.001)
