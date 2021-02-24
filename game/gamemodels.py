@@ -1,3 +1,10 @@
+'''
+WWII Pacific Front - gamemodels.py
+(C) 2021 Jesus Trujillo, Delaney Siggia, Calvin Guela, Anthony Jaimes, Rocco Carrozza
+---
+This module is responsible for multiplayer capabilities.
+'''
+
 import pygame
 
 #creating ship object
