@@ -67,6 +67,6 @@ class ChatServer(Server):
             self.Pump()
             sleep(0.0001)
 
-s = ChatServer(localaddr=('0.0.0.0', 31425))
+s = ChatServer(localaddr=('0.0.0.0', 8792))
 s.Launch()
 
