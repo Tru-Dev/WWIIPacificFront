@@ -4,3 +4,6 @@ WWII Pacific Front - main.py
 ---
 This module is the entry point for the game client.
 '''
+
+with open('../assets/ocean.png') as img:
+    print(img)
