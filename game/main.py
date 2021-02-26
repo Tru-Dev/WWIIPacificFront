@@ -10,7 +10,7 @@ This module is the entry point for the game client.
 import random
 from gamemodels import Ship
 
-# TODO: import other people's modules and work and everything
+# TODO: import other people's modules and work
 
 
 #this function allows the user to place their ships at a point of their choice
