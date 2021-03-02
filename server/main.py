@@ -7,14 +7,55 @@ This module is the entry point for the game server.
 
 import asyncio
 import json
+from typing import Type
+
 import websockets
 
-async def echo(websocket, path):
-    async for message in websocket:
-        print(json.loads(message))
-        await websocket.send(message)
+class WSServer:
+    def __init__(self, ws: websockets.WebSocketServer, path: str) -> None:
+        self.ws = ws
+        self.path = path
 
-start_server = websockets.serve(echo, "0.0.0.0", 3000)
+    async def send(self, msg_type: str, data: dict) -> None:
+        await self.ws.send(json.dumps({'type': msg_type, 'data': data}))
 
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
+    async def recv(self) -> dict:
+        return json.loads(await self.ws.recv())
+
+    async def server(self) -> None:
+        pass
+
+
+class WSServerRunner:
+    def __init__(
+        self,
+        ws_server_class: Type[WSServer],
+        host: str='0.0.0.0',
+        port: int=8000
+    ) -> None:
+        self.ws_server_class = ws_server_class
+        self.start_server = websockets.serve(self.server, host, port)
+
+    async def server(self, ws: websockets.WebSocketServer, path: str) -> None:
+        server_instance = self.ws_server_class(ws, path)
+        await server_instance.server()
+    
+    def run(self) -> None:
+        try:
+            asyncio.get_event_loop().run_until_complete(self.start_server)
+            asyncio.get_event_loop().run_forever()
+        except KeyboardInterrupt:
+            pass
+
+
+class ChatServer(WSServer):
+    async def server(self) -> None:
+        while True:
+            recv = await self.recv()
+            print(recv)
+            await self.send('echo', recv)
+
+
+runner = WSServerRunner(ChatServer)
+
+runner.run()
