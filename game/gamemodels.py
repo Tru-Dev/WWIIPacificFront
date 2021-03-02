@@ -13,7 +13,7 @@ class Ship(pygame.sprite.Sprite):
     def __init__(self, pos_x, pos_y,image_file,location): #varibles ship has
 
         super().__init__()
-        self.image = pygame.image.load(Path(__file__).parent.parent / 'assets' / image_file)
+        self.image = pygame.image.load(Path(__file__).parent.parent / 'assets' / 'img' / image_file)
         self.rect = self.image.get_rect()
         self.rect.center = [pos_x,pos_y]
 
@@ -83,24 +83,24 @@ if __name__ == '__main__':
     crosshair_group = pygame.sprite.Group()
     crosshair_group.add(crosshair)
 
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-    pygame.display.flip()
-    screen.fill([100, 160, 255])
-    screen.blit(background.image, background.rect)
+        pygame.display.flip()
+        screen.fill([100, 160, 255])
+        screen.blit(background.image, background.rect)
 
-    grid_group.draw(screen)
-    ship_group.draw(screen)
-    crosshair_group.draw(screen)
-    crosshair_group.update()
-    
-    clock.tick(60)
+        grid_group.draw(screen)
+        ship_group.draw(screen)
+        crosshair_group.draw(screen)
+        crosshair_group.update()
+        
+        clock.tick(60)
 
 
-#
-    # Write test code here...
-    #pygame.init()
+        #
+        # Write test code here...
+        #pygame.init()
