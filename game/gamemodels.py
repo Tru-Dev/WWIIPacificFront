@@ -12,6 +12,7 @@ from math import copysign
 import numpy as np
 import pygame
 from pygame.color import Color
+from pygame.cursors import sizer_y_strings
 import pygame.sprite
 import pygame.image
 import pygame.display
@@ -41,7 +42,7 @@ class SingleTileOverlay(pygame.sprite.DirtySprite):
         color: pygame.Color,
         pos: Tuple[int, int],
         *groups: pygame.sprite.AbstractGroup,
-        layer: int=900,
+        layer: int=800,
         offset: Tuple[int, int]=(0, 0)
     ) -> None:
         self._layer = layer
@@ -91,6 +92,37 @@ class FiredTile(pygame.sprite.DirtySprite):
         else:
             self.image.set_alpha(5 + mod_ticks // 8)
 
+class FiringGrid(pygame.sprite.DirtySprite):
+    def __init__(
+        self,
+        size: Tuple[int, int],
+        *groups: pygame.sprite.AbstractGroup,
+        layer: int=800,
+        offset: Tuple[int, int]=(0, 0)
+    ) -> None:
+        self._layer = layer
+        super().__init__(*groups)
+        w, h = size
+        ox, oy = offset
+        self.rect = pygame.Rect(ox, oy, w * TILE_SIZE, h * TILE_SIZE)
+        ckey = Color('Magenta')
+        self.hit_img = pygame.image.load(
+            Path(__file__).parent.parent / 'assets' / 'img' / 'hit.png'
+        )
+        self.hit_img.set_colorkey(ckey)
+        self.miss_img = pygame.image.load(
+            Path(__file__).parent.parent / 'assets' / 'img' / 'miss.png'
+        )
+        self.hit_img.set_colorkey(ckey)
+        self.hit_overlay = pygame.Surface((TILE_SIZE, TILE_SIZE))
+        self.hit_overlay.fill(ckey)
+        self.hit_overlay.set_colorkey(ckey)
+        pygame.draw.rect(self.hit_overlay, Color('Red'), self.hit_overlay.get_rect(), 2, 16)
+        self.miss_overlay = pygame.Surface((TILE_SIZE, TILE_SIZE))
+        self.miss_overlay.fill(ckey)
+        self.miss_overlay.set_colorkey(ckey)
+        pygame.draw.rect(self.miss_overlay, Color('White'), self.miss_overlay.get_rect(), 2, 16)
+
 class Ship(pygame.sprite.DirtySprite):
     def __init__(
         self,
@@ -122,7 +154,7 @@ class OverlayGrid(pygame.sprite.DirtySprite):
         size: Tuple[int, int],
         *groups: pygame.sprite.AbstractGroup,
         color: pygame.Color=pygame.Color(127, 200, 255),
-        layer: int=850
+        layer: int=750
     ) -> None:
         self._layer = layer
         super().__init__(*groups)
@@ -234,6 +266,7 @@ class SnapCrosshair(pygame.sprite.DirtySprite):
         pygame.draw.rect(self.image, color, self.rect.move(32, -32), 4, 16)
         pygame.draw.rect(self.image, color, self.rect.move(-32, 32), 4, 16)
         pygame.draw.rect(self.image, color, self.rect.move(32, 32), 4, 16)
+        pygame.draw.rect(self.image, color, self.rect, 4, 16)
     
     def update(self, *args, offset: Tuple[int, int], **kwargs) -> None:
         mx, my = pygame.mouse.get_pos()
@@ -311,8 +344,7 @@ class ScrollingGroup(pygame.sprite.LayeredDirty):
         for spr in self:
             if spr.dirty == 0:
                 spr.dirty = 1
-            spr.rect.x += effective_velx
-            spr.rect.y += effective_vely
+            spr.rect.move_ip(effective_velx, effective_vely)
 
     def get_offset(self) -> Tuple[int, int]:
         return self.ref_spr.rect.topleft
@@ -334,7 +366,7 @@ if __name__ == '__main__':
     shift_vel = 5
 
     board_group = ScrollingGroup(background, base_velocity=base_vel)
-    overlay_grid = OverlayGrid((30, 30), board_group)
+    overlay_grid = OverlayGrid((0, 0), (30, 30), board_group)
     overlay_grid.visible = 0
 
     ui_group = pygame.sprite.LayeredDirty()
