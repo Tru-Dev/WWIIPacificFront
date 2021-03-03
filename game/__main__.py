@@ -129,8 +129,8 @@ def place_cpu_ship(board: Board, ship: Ship):
 
     #places the boat vertically
     if orientation == 1:
-        col = random.randint(15)
-        row = random.randint(15 - ship.size)
+        col = random.randint(0, 15)
+        row = random.randint(0, 15 - ship.size)
 
         for i in range(ship.size):
             ship.coordinates.append(Tile(row+i, col))
@@ -152,8 +152,8 @@ def place_cpu_ship(board: Board, ship: Ship):
 
     #places the boat horizontally
     elif orientation == 2:
-        row = random.randint(15)
-        col = random.randint(15-ship.size)
+        row = random.randint(0, 15)
+        col = random.randint(0, 15-ship.size)
 
         for i in range(ship.size):
             ship.coordinates.append(Tile(row, col+i))
@@ -210,8 +210,8 @@ def take_turn(board: Board):
 #this function should have the program attack a spot on the user's board
 def cpu_turn(board):
     #program chooses a random spot on the grid to attack
-    row = random.randint(16)
-    col = random.randint(16)
+    row = random.randint(0, 16)
+    col = random.randint(0, 16)
 
     if Tile([row][col]).attacked == False:
         print(f"The computer has attacked at row {row}, column {col}.")
