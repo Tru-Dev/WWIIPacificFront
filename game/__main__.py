@@ -1,7 +1,6 @@
+# WWII Pacific Front - main.py
+# (C) 2021 Jesus Trujillo, Delaney Siggia, Calvin Guela, Anthony Jaimes, Rocco Carrozza
 '''
-WWII Pacific Front - main.py
-(C) 2021 Jesus Trujillo, Delaney Siggia, Calvin Guela, Anthony Jaimes, Rocco Carrozza
----
 This module is the entry point for the game client.
 '''
 
@@ -9,7 +8,7 @@ This module is the entry point for the game client.
 #needs to be tested with other modules to debug
 
 import random
-from gamemodels import Ship
+from .gamemodels import Ship
 
 # TODO: import other people's modules and work and everything  (specifically Board and Tiles)
 
