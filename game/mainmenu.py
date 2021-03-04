@@ -8,6 +8,7 @@ import pygame.image
 import pygame.transform
 
 
+
 class Background(pygame.sprite.DirtySprite):
     def __init__(self, image_file,location):
         super().__init__()  #call Sprite initializer
@@ -15,19 +16,20 @@ class Background(pygame.sprite.DirtySprite):
         self.image = pygame.transform.scale(self.image, (800, 600))
         self.rect = self.image.get_rect()
 
-mainClock = pygame.time.Clock()
-from pygame.locals import *
 pygame.init()
+from pygame.locals import *
+
+mainClock = pygame.time.Clock()
 pygame.display.set_caption('game base')
 screen = pygame.display.set_mode((800,600),0,32)
 
 font = pygame.freetype.Font(Path(__file__).parent.parent / 'assets' / 'font' / 'CutiveMono-Regular.ttf', 40)
+font2 = pygame.freetype.Font(Path(__file__).parent.parent / 'assets' / 'font' / 'CutiveMono-Regular.ttf', 20)
 
 background = Background('menubg.png', [0,0])
 
 def draw_text(text,font,color,surface,x,y):
-    textobj = font.render(text,1,color)
-    textrect = textobj.get_rect()
+    textobj, textrect = font.render(text,color)
     textrect.topleft = (x,y)
     surface.blit(textobj, textrect)
 
@@ -43,6 +45,8 @@ def main_menu():
 
         button_1 = pygame.Rect(50,100,200,50)
         button_2 = pygame.Rect(50,200,200,50)
+        button_3 = mygame.rect(50,100,500,50)
+        button_4 = mygame.rect(50,200,500,50)
 
         if button_1.collidepoint((mx,my)):
             if click:
@@ -50,10 +54,17 @@ def main_menu():
             
         if button_2.collidepoint((mx,my)):
             if click:
-                options()
+                muiliplayer()
+
+        if button_2.collidepoint((mx,my)):
+            if click:
+                options() 
 
         pygame.draw.rect(screen, (255,255,255), button_1)
-        pygame.draw.rect(screen, (255,0,0), button_2)
+        pygame.draw.rect(screen, (255,255,255), button_2)
+
+        draw_text('Start Story',font2, (0,0,0), screen,75,120)
+        draw_text('Multiplayer',font2, (0,0,0), screen,75,220)
 
         click = False
 
@@ -90,11 +101,11 @@ def game():
         pygame.display.update()
         mainClock.tick(60)  
 
-def options():
+def Multiplayer():
     running = True
     while running:
         screen.fill((0,0,0))
-        draw_text('Options',font, (255,255,255), screen,350,50)
+        draw_text('Multiplayer',font, (255,255,255), screen,350,50)
         for event in pygame.event.get():
             if event.type == QUIT:
                 pygame.quit()
