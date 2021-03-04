@@ -25,18 +25,6 @@ import pygame.surfarray
 
 TILE_SIZE: Final[int] = 64
 
-class OceanBGSegment(pygame.sprite.DirtySprite):
-    def __init__(self, menubg: 'MenuBackground', layer: int):
-        super().__init__(menubg)
-
-class MenuBackground(pygame.sprite.LayeredDirty):
-    def __init__(self, screen_size: Tuple[int, int]) -> None:
-        super().__init__()
-        self.bg_base = pygame.image.load(
-            Path(__file__).parent.parent / 'assets' / 'img' / 'oceanbg.png'
-        )
-        
-
 class Player:
     def __init__(self) -> None:
         pass

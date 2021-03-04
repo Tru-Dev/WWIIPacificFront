@@ -23,7 +23,7 @@ screen = pygame.display.set_mode((800,600),0,32)
 
 font = pygame.freetype.Font(Path(__file__).parent.parent / 'assets' / 'font' / 'CutiveMono-Regular.ttf', 40)
 
-background = Background('mback.jpg', [0,0])
+background = Background('menubg.png', [0,0])
 
 def draw_text(text,font,color,surface,x,y):
     textobj = font.render(text,1,color)
