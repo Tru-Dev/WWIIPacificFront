@@ -438,6 +438,7 @@ if __name__ == '__main__':
     overlay_grid.visible = 0
 
     ui_group = pygame.sprite.LayeredDirty()
+    
 
     #Ships
 
