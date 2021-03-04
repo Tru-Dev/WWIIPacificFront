@@ -1,5 +1,11 @@
-import pygame,sys
 from pathlib import Path
+import sys
+
+import pygame
+import pygame.freetype
+import pygame.display
+import pygame.image
+import pygame.transform
 
 
 class Background(pygame.sprite.DirtySprite):
@@ -15,7 +21,7 @@ pygame.init()
 pygame.display.set_caption('game base')
 screen = pygame.display.set_mode((800,600),0,32)
 
-font = pygame.font.SysFont('times new roman', 40)
+font = pygame.freetype.Font(Path(__file__).parent.parent / 'assets' / 'font' / 'CutiveMono-Regular.ttf', 40)
 
 background = Background('mback.jpg', [0,0])
 

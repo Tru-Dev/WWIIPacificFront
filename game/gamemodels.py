@@ -6,13 +6,12 @@ This module defines the game classes.
 '''
 
 from pathlib import Path
-from typing import Final, List, Tuple
+from typing import Final, List, Tuple, Union, overload
 from math import copysign
+from enum import IntFlag, auto
 
 import numpy as np
 import pygame
-from pygame.color import Color
-from pygame.cursors import sizer_y_strings
 import pygame.sprite
 import pygame.image
 import pygame.display
@@ -26,6 +25,17 @@ import pygame.surfarray
 
 TILE_SIZE: Final[int] = 64
 
+class OceanBGSegment(pygame.sprite.DirtySprite):
+    pass
+
+class MenuBackground(pygame.sprite.LayeredDirty):
+    def __init__(self) -> None:
+        super().__init__()
+        self.bg_base = pygame.image.load(
+            Path(__file__).parent.parent / 'assets' / 'img' / 'oceanbg.png'
+        )
+
+
 class Player:
     def __init__(self) -> None:
         pass
@@ -34,6 +44,15 @@ class USPlayer(Player):
     pass
 
 class JapanPlayer(Player):
+    '''
+    Multiplayer-only Japan player
+    '''
+    pass
+
+class JapanCPUPlayer(Player):
+    '''
+    Regular Japan player
+    '''
     pass
 
 class SingleTileOverlay(pygame.sprite.DirtySprite):
@@ -74,7 +93,7 @@ class FiredTile(pygame.sprite.DirtySprite):
         self.image = pygame.image.load(
             Path(__file__).parent.parent / 'assets' / 'img' / img_file
         ).convert()
-        self.image.set_colorkey(pygame.Color('#FF00FF'))
+        self.image.set_colorkey(pygame.Color('Magenta'))
         tx, ty = pos
         ox, oy = offset
         self.rect = self.image.get_rect().move(tx * TILE_SIZE, ty * TILE_SIZE)
@@ -82,7 +101,7 @@ class FiredTile(pygame.sprite.DirtySprite):
 
         self.dirty = 2
 
-        bordercolor = Color('Red' if hit else 'White')
+        bordercolor = pygame.Color('Red' if hit else 'White')
         pygame.draw.rect(self.image, bordercolor, self.image.get_rect(), 2, 16)
 
     def update(self, *args, **kwargs) -> None:
@@ -91,37 +110,6 @@ class FiredTile(pygame.sprite.DirtySprite):
             self.image.set_alpha(255 - mod_ticks // 8)
         else:
             self.image.set_alpha(5 + mod_ticks // 8)
-
-class FiringGrid(pygame.sprite.DirtySprite):
-    def __init__(
-        self,
-        size: Tuple[int, int],
-        *groups: pygame.sprite.AbstractGroup,
-        layer: int=800,
-        offset: Tuple[int, int]=(0, 0)
-    ) -> None:
-        self._layer = layer
-        super().__init__(*groups)
-        w, h = size
-        ox, oy = offset
-        self.rect = pygame.Rect(ox, oy, w * TILE_SIZE, h * TILE_SIZE)
-        ckey = Color('Magenta')
-        self.hit_img = pygame.image.load(
-            Path(__file__).parent.parent / 'assets' / 'img' / 'hit.png'
-        )
-        self.hit_img.set_colorkey(ckey)
-        self.miss_img = pygame.image.load(
-            Path(__file__).parent.parent / 'assets' / 'img' / 'miss.png'
-        )
-        self.hit_img.set_colorkey(ckey)
-        self.hit_overlay = pygame.Surface((TILE_SIZE, TILE_SIZE))
-        self.hit_overlay.fill(ckey)
-        self.hit_overlay.set_colorkey(ckey)
-        pygame.draw.rect(self.hit_overlay, Color('Red'), self.hit_overlay.get_rect(), 2, 16)
-        self.miss_overlay = pygame.Surface((TILE_SIZE, TILE_SIZE))
-        self.miss_overlay.fill(ckey)
-        self.miss_overlay.set_colorkey(ckey)
-        pygame.draw.rect(self.miss_overlay, Color('White'), self.miss_overlay.get_rect(), 2, 16)
 
 class Ship(pygame.sprite.DirtySprite):
     def __init__(
@@ -132,12 +120,91 @@ class Ship(pygame.sprite.DirtySprite):
         layer: int=10
     ):
         self._layer = layer
-        super().__init__(*groups)
         self.image = pygame.image.load(Path(__file__).parent.parent / 'assets' / 'img' / img_file)
         self.rect = self.image.get_rect()
         self.rect.topleft = pos
         self.rect.x *= TILE_SIZE
         self.rect.y *= TILE_SIZE
+        self.tile_rect = pygame.Rect(pos, (self.rect.w // TILE_SIZE, self.rect.h // TILE_SIZE))
+        super().__init__(*groups)
+
+class ShipGroup(pygame.sprite.Group):
+    def __init__(self, *sprites: Ship) -> None:
+        self.ship_tiles = {}
+        super().__init__(*sprites)
+    
+    def add_internal(self, sprite: Ship) -> None:
+        super().add_internal(sprite)
+        self.ship_tiles.update({
+            (x, y): sprite
+                for x in range(sprite.tile_rect.left, sprite.tile_rect.right)
+                for y in range(sprite.tile_rect.top, sprite.tile_rect.bottom)
+        })
+
+class ShotStyle(IntFlag):
+    CLASSIC = auto()
+    CLEAN = auto()
+    BOTH = CLASSIC | CLEAN
+
+class FiringGrid(pygame.sprite.DirtySprite):
+    def __init__(
+        self,
+        size: Tuple[int, int],
+        style: ShotStyle,
+        ship_group: ShipGroup,
+        *groups: pygame.sprite.AbstractGroup,
+        layer: int=800,
+        offset: Tuple[int, int]=(0, 0)
+    ) -> None:
+        self._layer = layer
+        super().__init__(*groups)
+        w, h = size
+        ox, oy = offset
+        self.rect = pygame.Rect(ox, oy, w * TILE_SIZE, h * TILE_SIZE)
+        ckey = pygame.Color('Magenta')
+        self.image = pygame.Surface(self.rect.size)
+        self.image.fill(ckey)
+        self.image.set_colorkey(ckey)
+        self.hit_img = pygame.Surface((TILE_SIZE, TILE_SIZE))
+        self.hit_img.fill(ckey)
+        self.hit_img.set_colorkey(ckey)
+        self.miss_img = self.hit_img.copy()
+        if style & ShotStyle.CLASSIC:
+            self.hit_img.blit(pygame.image.load(
+                Path(__file__).parent.parent / 'assets' / 'img' / 'hit.png'
+            ), (0, 0))
+            self.miss_img.blit(pygame.image.load(
+                Path(__file__).parent.parent / 'assets' / 'img' / 'miss.png'
+            ), (0, 0))
+        if style & ShotStyle.CLEAN:
+            pygame.draw.rect(
+                self.hit_img, pygame.Color('Red'), self.hit_img.get_rect(), 2, 16
+            )
+            pygame.draw.rect(
+                self.miss_img, pygame.Color('White'), self.miss_img.get_rect(), 2, 16
+            )
+        self.style = style
+        self.ship_group = ship_group
+        self.shots = [[False for i in range(w)] for j in range(h)]
+        self.dirty = 2
+
+    def shoot(self, pos: Tuple[int, int]) -> bool:
+        x, y = pos
+        self.shots[y][x] = True
+        if pos in self.ship_group.ship_tiles:
+            self.image.blit(self.hit_img, (x * TILE_SIZE, y * TILE_SIZE))
+            return True
+        else:
+            self.image.blit(self.miss_img, (x * TILE_SIZE, y * TILE_SIZE))
+            return False
+
+    def update(self, *args, **kwargs) -> None:
+        mod_ticks = pygame.time.get_ticks() % 2000
+        if mod_ticks // 1000 == 0:
+            self.image.set_alpha(255 - mod_ticks // 8)
+        else:
+            self.image.set_alpha(5 + mod_ticks // 8)
+
 
 class Grid(pygame.sprite.DirtySprite):
     def __init__(self, width, height, pos_x, pos_y, color): #varibles grid has
@@ -371,20 +438,22 @@ if __name__ == '__main__':
 
     ui_group = pygame.sprite.LayeredDirty()
     
+
     #Ships
 
-    ship_group = pygame.sprite.Group()
+    ship_group = ShipGroup()
     s1 = Ship((0, 0), 'essex.png', board_group, ship_group)
     s2 = Ship((5, 1), 'essex.png', board_group, ship_group)
     s3 = Ship((10, 0), 'essex.png', board_group, ship_group)
     s4 = Ship((15, 1), 'essex.png', board_group, ship_group)
     s5 = Ship((20, 0), 'essex.png', board_group, ship_group)
 
-    hit1 = FiredTile(True, (0, 0), board_group)
-    miss1 = FiredTile(False, (0, 1), board_group)
+    firegrid = FiringGrid((30, 30), ShotStyle.CLASSIC, ship_group, board_group)
+    print(firegrid.shoot((0, 0)))
+    print(firegrid.shoot((1, 1)))
 
     #Crosshair
-    crosshair = SnapCrosshair(Color('Black'), ui_group)
+    crosshair = SnapCrosshair(pygame.Color('Black'), ui_group)
 
     # pygame.mouse.set_visible(False) # hide the mouse for the crosshair
 
