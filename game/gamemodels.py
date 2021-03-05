@@ -6,12 +6,14 @@ This module defines the game classes.
 '''
 
 from pathlib import Path
-from typing import Final, List, Sequence, Tuple, Union, overload
+from typing import Callable, Final, List, Tuple, Type
 from math import copysign
 from enum import IntFlag, auto
 
 import numpy as np
 import pygame
+from pygame import font
+from pygame.scrap import set_mode
 import pygame.sprite
 import pygame.image
 import pygame.display
@@ -22,6 +24,7 @@ import pygame.time
 import pygame.event
 import pygame.key
 import pygame.surfarray
+import pygame.freetype
 
 TILE_SIZE: Final[int] = 64
 
@@ -230,10 +233,23 @@ class OverlayGrid(pygame.sprite.DirtySprite):
 
 
 class Background(pygame.sprite.DirtySprite):
-    def __init__(self, image_file):
-        super().__init__()  #call Sprite initializer
-        self.image = pygame.image.load(Path(__file__).parent.parent / 'assets' / 'img' / image_file)
-        self.image = pygame.transform.scale(self.image, (800, 600))
+    def __init__(
+        self,
+        img_file: str,
+        size: Tuple[int, int],
+        *groups: pygame.sprite.AbstractGroup,
+        layer: int=-1000
+    ):
+        self._layer = layer
+        super().__init__(*groups)
+        self.base_image = pygame.image.load(
+            Path(__file__).parent.parent / 'assets' / 'img' / img_file
+        )
+        self.image = pygame.transform.scale(self.base_image, size)
+        self.rect = self.image.get_rect()
+
+    def resize(self, size: Tuple[int, int]) -> None:
+        self.image = pygame.transform.scale(self.base_image, size)
         self.rect = self.image.get_rect()
 
 class TiledBackground(pygame.sprite.DirtySprite):
@@ -405,15 +421,72 @@ class ScrollingGroup(pygame.sprite.LayeredDirty):
     def get_offset(self) -> Tuple[int, int]:
         return self.ref_spr.rect.topleft
 
+class Button(pygame.sprite.DirtySprite):
+    def __init__(
+        self,
+        rect: pygame.Rect,
+        text: str,
+        font: pygame.freetype.Font,
+        fg: pygame.Color,
+        bg: pygame.Color,
+        click: Callable,
+        *groups: pygame.sprite.AbstractGroup,
+        text_size: int=24,
+        layer: int=20,
+        border_radius: int=24,
+        ckey: pygame.Color=pygame.Color('Magenta')
+    ) -> None:
+        self._layer = layer
+        super().__init__(*groups)
+        self.rect = rect
+        self.text = text
+        self.fg = fg
+        self.bg = bg
+        self.font = font
+        self.text_size = text_size
+        self.image = pygame.Surface(rect.size)
+        self.ckey = ckey
+        self.border_radius = border_radius
+        self.image.fill(ckey)
+        self.image.set_colorkey(ckey)
+        pygame.draw.rect(self.image, bg, self.image.get_rect(), border_radius=border_radius)
+        text_rect = self.font.get_rect(text, size=text_size)
+        text_rect.center = self.image.get_rect().center
+        self.font.render_to(self.image, text_rect, None, fg, size=text_size)
+        self.base_image = self.image.copy()
+        self.hover_image = self.image.copy()
+        self.hover_image.fill(pygame.Color('#404040'), special_flags=pygame.BLEND_SUB)
+        self.hover_image.set_colorkey(pygame.Color('#BF00BF'))
+        self.hover = False
+        self.click = click
+        self.clicked = False
+
+    def update(self, *args, **kwargs) -> None:
+        mpos = pygame.mouse.get_pos()
+        if self.rect.collidepoint(mpos):
+            if not self.hover:
+                self.hover = True
+                self.image = self.hover_image
+            mdown = pygame.mouse.get_pressed()[0]
+            if mdown and self.hover and not self.clicked:
+                self.click()
+                self.clicked = True
+            elif self.clicked:
+                self.clicked = False
+        elif self.hover:
+            self.hover = False
+            self.image = self.base_image
+
 class Scene:
-    def __init__(self, gameloop: 'GameLoop') -> None:
+    def __init__(self, gameloop: 'GameLoop', caption: str) -> None:
         self.gameloop = gameloop
         self.render_group = pygame.sprite.LayeredDirty()
+        self.caption = caption
 
     def update(self) -> None:
-        self.rect
+        pass
 
-    def render(self, screen) -> List[pygame.Rect]:
+    def render(self, screen: pygame.Surface) -> List[pygame.Rect]:
         pass
 
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -421,9 +494,136 @@ class Scene:
 
 class MainMenu(Scene):
     def __init__(self, gameloop: 'GameLoop') -> None:
-        super().__init__(gameloop)
+        super().__init__(gameloop, 'WWII Pacific Front')
+        ssize = gameloop.screen.get_rect().size
+        self.bg = Background('menubg.png', ssize, self.render_group)
+        self.gameloop = gameloop
+        self.font = pygame.freetype.Font(
+            Path(__file__).parent.parent / 'assets' / 'font' / 'CutiveMono-Regular.ttf', 48
+        )
+        frect = self.font.get_rect('WWII: Pacific Front')
+        frect.right = ssize[0] * 14 // 15
+        frect.bottom = ssize[1] // 8
+        titlepos = frect.topleft
+        self.font.render_to(self.bg.image, titlepos, 'WWII: Pacific Front', pygame.Color('Black'))
+        brect = pygame.Rect(ssize[0] // 15, ssize[1] // 5 + 50, 200, 50)
+        self.buttons = pygame.sprite.Group()
+        self.storybutton = Button(
+            brect,
+            'Story',
+            self.font,
+            pygame.Color('White'),
+            pygame.Color('Navy'),
+            lambda: gameloop.change_scene('menu_story'),
+            self.render_group, self.buttons
+        )
+        self.freeplaybutton = Button(
+            brect.move(250, 0),
+            'Freeplay',
+            self.font,
+            pygame.Color('White'),
+            pygame.Color('Mediumblue'),
+            lambda: gameloop.change_scene('menu_freeplay'),
+            self.render_group, self.buttons
+        )
+        self.multiplayerbutton = Button(
+            brect.move(0, 75),
+            'Multiplayer',
+            self.font,
+            pygame.Color('White'),
+            pygame.Color('Red'),
+            lambda: gameloop.change_scene('menu_multiplayer'),
+            self.render_group, self.buttons
+        )
+        self.optionsbutton = Button(
+            brect.move(250, 75),
+            'Options',
+            self.font,
+            pygame.Color('Black'),
+            pygame.Color('White'),
+            lambda: gameloop.change_scene('menu_options'),
+            self.render_group, self.buttons
+        )
+    
+    def update(self) -> None:
+        self.buttons.update()
+    
+    def render(self, screen: pygame.Surface) -> List[pygame.Rect]:
+        return self.render_group.draw(screen)
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        if event.type == pygame.VIDEORESIZE:
+            self.resize(event.size)
+
+    def resize(self, size: Tuple[int, int]) -> None:
+        self.bg.resize(size)
+        frect = self.font.get_rect('WWII: Pacific Front')
+        frect.right = size[0] * 14 // 15
+        frect.bottom = size[1] // 8
+        titlepos = frect.topleft
+        self.font.render_to(self.bg.image, titlepos, 'WWII: Pacific Front', pygame.Color('Black'))
+        brect = pygame.Rect(size[0] // 15, size[1] // 5 + 50, 200, 50)
+        self.storybutton.rect = brect
+        self.freeplaybutton.rect = brect.move(250, 0)
+        self.multiplayerbutton.rect = brect.move(0, 75)
+        self.optionsbutton.rect = brect.move(250, 75)
 
 class StoryMenu(Scene):
+    def __init__(self, gameloop: 'GameLoop') -> None:
+        super().__init__(gameloop)
+        ssize = gameloop.screen.get_rect().size
+        self.bg = Background('menubg.png', ssize, self.render_group)
+        self.bg.base_image.fill(pygame.Color('#404040'), special_flags=pygame.BLEND_SUB)
+        self.bg.image.fill(pygame.Color('#404040'), special_flags=pygame.BLEND_SUB)
+        self.gameloop = gameloop
+        self.font = pygame.freetype.Font(
+            Path(__file__).parent.parent / 'assets' / 'font' / 'CutiveMono-Regular.ttf', 48
+        )
+        frect = self.font.get_rect('Story Mode')
+        frect.right = ssize[0] * 14 // 15
+        frect.bottom = ssize[1] // 8
+        titlepos = frect.topleft
+        self.font.render_to(self.bg.image, titlepos, 'WWII: Pacific Front', pygame.Color('Black'))
+        brect = pygame.Rect(ssize[0] // 15, ssize[1] // 5 + 50, 200, 50)
+        self.buttons = pygame.sprite.Group()
+        self.storybutton = Button(
+            brect,
+            'Story',
+            self.font,
+            pygame.Color('White'),
+            pygame.Color('Navy'),
+            lambda: gameloop.change_scene('menu_story'),
+            self.render_group, self.buttons
+        )
+        self.freeplaybutton = Button(
+            brect.move(250, 0),
+            'Freeplay',
+            self.font,
+            pygame.Color('White'),
+            pygame.Color('Mediumblue'),
+            lambda: gameloop.change_scene('menu_freeplay'),
+            self.render_group, self.buttons
+        )
+        self.multiplayerbutton = Button(
+            brect.move(0, 75),
+            'Multiplayer',
+            self.font,
+            pygame.Color('White'),
+            pygame.Color('Red'),
+            lambda: gameloop.change_scene('menu_multiplayer'),
+            self.render_group, self.buttons
+        )
+        self.optionsbutton = Button(
+            brect.move(250, 75),
+            'Options',
+            self.font,
+            pygame.Color('Black'),
+            pygame.Color('White'),
+            lambda: gameloop.change_scene('menu_options'),
+            self.render_group, self.buttons
+        )
+
+class FreeplayMenu(Scene):
     pass
 
 class MultiplayerMenu(Scene):
@@ -442,11 +642,24 @@ class MultiplayerGame(Scene):
     pass
 
 class GameLoop:
-    def __init__(self, init_scene: Scene) -> None:
-        self.current_scene = init_scene
-        self.running = False
+    scenedict = {
+        'menu_main': MainMenu,
+        'menu_story': StoryMenu,
+        'menu_freeplay': FreeplayMenu,
+        'menu_multiplayer': MultiplayerMenu,
+        'menu_options': OptionsMenu,
+        'game_story': StoryGame,
+        'game_freeplay': FreeplayGame,
+        'game_multiplayer': MultiplayerGame,
+    }
 
-    def run(self, screen: pygame.Surface) -> None:
+    def __init__(self, init_scene: str, size: Tuple[int, int]) -> None:
+        self.running = False
+        self.screen = pygame.display.set_mode(size, flags=pygame.RESIZABLE)
+        self.current_scene: Scene = GameLoop.scenedict[init_scene](self)
+        self.clock = pygame.time.Clock()
+
+    def run(self) -> None:
         self.running = True
         while self.running:
             for event in pygame.event.get():
@@ -455,7 +668,14 @@ class GameLoop:
                 else:
                     self.current_scene.handle_event(event)
             self.current_scene.update()
-            pygame.display.update(self.current_scene.render(screen))
+            pygame.display.update(self.current_scene.render(self.screen))
+            self.clock.tick(60)
+            pygame.display.set_caption(
+                f'{self.current_scene.caption} (FPS: {self.clock.get_fps()})'
+            )
+
+    def change_scene(self, scene: str):
+        self.current_scene = GameLoop.scenedict[scene](self)
 
 if __name__ == '__main__':
 
