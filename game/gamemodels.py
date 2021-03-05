@@ -6,7 +6,7 @@ This module defines the game classes.
 '''
 
 from pathlib import Path
-from typing import Final, List, Tuple, Union, overload
+from typing import Final, List, Sequence, Tuple, Union, overload
 from math import copysign
 from enum import IntFlag, auto
 
@@ -404,6 +404,58 @@ class ScrollingGroup(pygame.sprite.LayeredDirty):
 
     def get_offset(self) -> Tuple[int, int]:
         return self.ref_spr.rect.topleft
+
+class Scene:
+    def __init__(self, gameloop: 'GameLoop') -> None:
+        self.gameloop = gameloop
+        self.render_group = pygame.sprite.LayeredDirty()
+
+    def update(self) -> None:
+        self.rect
+
+    def render(self, screen) -> List[pygame.Rect]:
+        pass
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        pass
+
+class MainMenu(Scene):
+    def __init__(self, gameloop: 'GameLoop') -> None:
+        super().__init__(gameloop)
+
+class StoryMenu(Scene):
+    pass
+
+class MultiplayerMenu(Scene):
+    pass
+
+class OptionsMenu(Scene):
+    pass
+
+class StoryGame(Scene):
+    pass
+
+class FreeplayGame(Scene):
+    pass
+
+class MultiplayerGame(Scene):
+    pass
+
+class GameLoop:
+    def __init__(self, init_scene: Scene) -> None:
+        self.current_scene = init_scene
+        self.running = False
+
+    def run(self, screen: pygame.Surface) -> None:
+        self.running = True
+        while self.running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT: # Catch window close events
+                    self.running = False
+                else:
+                    self.current_scene.handle_event(event)
+            self.current_scene.update()
+            pygame.display.update(self.current_scene.render(screen))
 
 if __name__ == '__main__':
 
