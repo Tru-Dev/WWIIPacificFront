@@ -6,14 +6,13 @@ This module defines the game classes.
 '''
 
 from pathlib import Path
-from typing import Callable, Final, List, Tuple, Type
+from typing import Callable, Final, List, Tuple
 from math import copysign
 from enum import IntFlag, auto
+import re
 
 import numpy as np
 import pygame
-from pygame import font
-from pygame.scrap import set_mode
 import pygame.sprite
 import pygame.image
 import pygame.display
@@ -433,7 +432,7 @@ class Button(pygame.sprite.DirtySprite):
         *groups: pygame.sprite.AbstractGroup,
         text_size: int=24,
         layer: int=20,
-        border_radius: int=24,
+        border_radius: int=20,
         ckey: pygame.Color=pygame.Color('Magenta')
     ) -> None:
         self._layer = layer
@@ -467,6 +466,7 @@ class Button(pygame.sprite.DirtySprite):
             if not self.hover:
                 self.hover = True
                 self.image = self.hover_image
+                self.dirty = 1
             mdown = pygame.mouse.get_pressed()[0]
             if mdown and self.hover and not self.clicked:
                 self.click()
@@ -476,6 +476,123 @@ class Button(pygame.sprite.DirtySprite):
         elif self.hover:
             self.hover = False
             self.image = self.base_image
+            self.dirty = 1
+
+class TextInput(pygame.sprite.DirtySprite):
+    def __init__(
+        self,
+        rect: pygame.Rect,
+        font: pygame.freetype.Font,
+        fg: pygame.Color,
+        bg: pygame.Color,
+        *groups: pygame.sprite.AbstractGroup,
+        default_text: str='',
+        text_size: int=24,
+        layer: int=20,
+        focus: bool=False
+    ) -> None:
+        self._layer = layer
+        super().__init__(*groups)
+        pygame.key.set_repeat(500, 25)
+        self.rect = rect
+        self.text = default_text
+        self.cursor = len(self.text)
+        self.fg = fg
+        self.bg = bg
+        self.font = font
+        self.text_size = text_size
+        self.image = pygame.Surface(rect.size)
+        self.image.fill(bg)
+        text_rect = self.font.get_rect(self.text, size=text_size).move(text_size // 2, 0)
+        text_rect.centery += self.image.get_rect().centery
+        self.font.render_to(self.image, text_rect, None, fg, size=text_size)
+        self.focus = focus
+        self.curs_rect = pygame.Rect(0, 0, 3, font.get_sized_height(text_size))
+        self.curs_rect.centery = self.image.get_rect().centery
+        self.curs_vis = False
+
+    def update(self, *args, **kwargs) -> None:
+        mpos = pygame.mouse.get_pos()
+        mdown = pygame.mouse.get_pressed()[0]
+        if self.rect.collidepoint(mpos) and mdown:
+            self.focus = True
+        elif mdown:
+            self.focus = False
+        self.image.fill(self.bg)
+        text_rect = self.font.get_rect(self.text, size=self.text_size).move(self.text_size // 2, 0)
+        text_rect.centery = self.image.get_rect().centery
+        self.font.render_to(self.image, text_rect, None, self.fg, size=self.text_size)
+        tick_comp = pygame.time.get_ticks() % 2000 >= 1000
+        if tick_comp and not self.curs_vis and self.focus:
+            self.curs_vis = True
+            self.dirty = 1
+        elif not tick_comp and self.curs_vis:
+            self.curs_vis = False
+            self.dirty = 1
+        if self.curs_vis:
+            curs_offset = self.font.get_rect(self.text[:self.cursor], size=self.text_size).right
+            self.image.fill(self.fg, self.curs_rect.move(curs_offset + self.text_size // 2, 0))
+    
+    def handle_event(self, event: pygame.event.Event) -> bool:
+        if not self.focus:
+            return False
+        if event.type == pygame.TEXTINPUT:
+            self.text = (
+                self.text[:self.cursor] + event.text + self.text[self.cursor:]
+            )
+            self.cursor += 1
+            self.dirty = 1
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                return True
+            elif event.key == pygame.K_BACKSPACE:
+                if len(self.text[:self.cursor]) > 0:
+                    if event.mod & (pygame.KMOD_CTRL | pygame.KMOD_ALT):
+                        text_until_cursor = self.text[:self.cursor]
+                        idx_from_end = re.search(r'(?!^)(\b)', text_until_cursor[::-1]).start()
+                        self.text = (
+                            text_until_cursor[:-idx_from_end] + self.text[self.cursor:]
+                        )
+                        self.cursor -= idx_from_end
+                    else:
+                        self.text = (
+                            self.text[:self.cursor - 1] + self.text[self.cursor:]
+                        )
+                        self.cursor -= 1
+                    self.dirty = 1
+            elif event.key == pygame.K_DELETE:
+                if self.cursor < len(self.text):
+                    if event.mod & (pygame.KMOD_CTRL | pygame.KMOD_ALT):
+                        text_from_cursor = self.text[self.cursor:]
+                        ahead_idx = re.search(r'(?!^)(\b|$)', text_from_cursor).start()
+                        self.text = (
+                            self.text[:self.cursor] + text_from_cursor[ahead_idx:]
+                        )
+                    else:
+                        self.text = (
+                            self.text[:self.cursor] + self.text[self.cursor + 1:]
+                        )
+                    self.dirty = 1
+            elif event.key == pygame.K_LEFT:
+                if self.cursor != 0:
+                    if event.mod & pygame.KMOD_CTRL:
+                        text_until_cursor = self.text[:self.cursor]
+                        idx_from_end = re.search(r'(?!^)(\b|$)', text_until_cursor[::-1]).start()
+                        self.cursor -= idx_from_end
+                    else:
+                        self.cursor -= 1
+                    self.dirty = 1
+            elif event.key == pygame.K_RIGHT:
+                if self.cursor != len(self.text):
+                    if event.mod & pygame.KMOD_CTRL:
+                        text_from_cursor = self.text[self.cursor:]
+                        ahead_idx = re.search(r'(?!^)(\b|$)', text_from_cursor).start()
+                        self.cursor += ahead_idx
+                    else:
+                        self.cursor += 1
+                    self.dirty = 1
+        return False
+
 
 class Scene:
     def __init__(self, gameloop: 'GameLoop', caption: str) -> None:
@@ -494,7 +611,7 @@ class Scene:
 
 class MainMenu(Scene):
     def __init__(self, gameloop: 'GameLoop') -> None:
-        super().__init__(gameloop, 'WWII Pacific Front')
+        super().__init__(gameloop, 'WWIIL: Pacific Front')
         ssize = gameloop.screen.get_rect().size
         self.bg = Background('menubg.png', ssize, self.render_group)
         self.gameloop = gameloop
@@ -554,6 +671,9 @@ class MainMenu(Scene):
     def handle_event(self, event: pygame.event.Event) -> None:
         if event.type == pygame.VIDEORESIZE:
             self.resize(event.size)
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.gameloop.running = False
 
     def resize(self, size: Tuple[int, int]) -> None:
         self.bg.resize(size)
@@ -561,67 +681,93 @@ class MainMenu(Scene):
         frect.right = size[0] * 14 // 15
         frect.bottom = size[1] // 8
         titlepos = frect.topleft
-        self.font.render_to(self.bg.image, titlepos, 'WWII: Pacific Front', pygame.Color('Black'))
+        self.font.render_to(self.bg.image, titlepos, None, pygame.Color('Black'))
         brect = pygame.Rect(size[0] // 15, size[1] // 5 + 50, 200, 50)
         self.storybutton.rect = brect
         self.freeplaybutton.rect = brect.move(250, 0)
         self.multiplayerbutton.rect = brect.move(0, 75)
         self.optionsbutton.rect = brect.move(250, 75)
+        self.bg.dirty = 1
 
 class StoryMenu(Scene):
     def __init__(self, gameloop: 'GameLoop') -> None:
-        super().__init__(gameloop)
+        super().__init__(gameloop, 'WWII: Pacific Front - Story')
         ssize = gameloop.screen.get_rect().size
         self.bg = Background('menubg.png', ssize, self.render_group)
         self.bg.base_image.fill(pygame.Color('#404040'), special_flags=pygame.BLEND_SUB)
         self.bg.image.fill(pygame.Color('#404040'), special_flags=pygame.BLEND_SUB)
+
         self.gameloop = gameloop
         self.font = pygame.freetype.Font(
             Path(__file__).parent.parent / 'assets' / 'font' / 'CutiveMono-Regular.ttf', 48
         )
-        frect = self.font.get_rect('Story Mode')
-        frect.right = ssize[0] * 14 // 15
-        frect.bottom = ssize[1] // 8
+        frect = self.font.get_rect('Story')
+        frect.centerx = ssize[0] // 2
+        frect.top = 20
+        self.bg.image.fill(pygame.Color('Gray16'), pygame.Rect(0, 0, ssize[0], frect.bottom + 20))
         titlepos = frect.topleft
-        self.font.render_to(self.bg.image, titlepos, 'WWII: Pacific Front', pygame.Color('Black'))
-        brect = pygame.Rect(ssize[0] // 15, ssize[1] // 5 + 50, 200, 50)
+        self.font.render_to(self.bg.image, titlepos, None, pygame.Color('White'))
+        brect = pygame.Rect(0, ssize[1] - 100, 200, 50)
+        brect.right = ssize[0] // 2 - 25
         self.buttons = pygame.sprite.Group()
-        self.storybutton = Button(
+        self.startbutton = Button(
             brect,
-            'Story',
+            'Begin',
             self.font,
             pygame.Color('White'),
             pygame.Color('Navy'),
             lambda: gameloop.change_scene('menu_story'),
             self.render_group, self.buttons
         )
-        self.freeplaybutton = Button(
+        self.backbutton = Button(
             brect.move(250, 0),
-            'Freeplay',
-            self.font,
-            pygame.Color('White'),
-            pygame.Color('Mediumblue'),
-            lambda: gameloop.change_scene('menu_freeplay'),
-            self.render_group, self.buttons
-        )
-        self.multiplayerbutton = Button(
-            brect.move(0, 75),
-            'Multiplayer',
-            self.font,
-            pygame.Color('White'),
-            pygame.Color('Red'),
-            lambda: gameloop.change_scene('menu_multiplayer'),
-            self.render_group, self.buttons
-        )
-        self.optionsbutton = Button(
-            brect.move(250, 75),
-            'Options',
+            'Back',
             self.font,
             pygame.Color('Black'),
             pygame.Color('White'),
-            lambda: gameloop.change_scene('menu_options'),
+            lambda: gameloop.change_scene('menu_main'),
             self.render_group, self.buttons
         )
+        irect = pygame.Rect(0, 0, 500, 50)
+        irect.center = self.bg.rect.center
+        self.nameinput = TextInput(
+            irect,
+            self.font,
+            pygame.Color('Black'),
+            pygame.Color('White'),
+            self.render_group,
+            text_size=24
+        )
+
+    def update(self) -> None:
+        self.buttons.update()
+        self.nameinput.update()
+
+    def render(self, screen: pygame.Surface) -> List[pygame.Rect]:
+        return self.render_group.draw(screen)
+
+    def handle_event(self, event: pygame.event.Event) -> None:
+        self.nameinput.handle_event(event)
+        if event.type == pygame.VIDEORESIZE:
+            self.resize(event.size)
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.gameloop.change_scene('menu_main')
+
+    def resize(self, size: Tuple[int, int]) -> None:
+        self.bg.resize(size)
+        frect = self.font.get_rect('Story')
+        frect.centerx = size[0] // 2
+        frect.top = 20
+        self.bg.image.fill(pygame.Color('Gray16'), pygame.Rect(0, 0, size[0], frect.bottom + 20))
+        titlepos = frect.topleft
+        self.font.render_to(self.bg.image, titlepos, None, pygame.Color('White'))
+        brect = pygame.Rect(0, size[1] - 100, 200, 50)
+        brect.right = size[0] // 2 - 25
+        self.startbutton.rect = brect
+        self.backbutton.rect = brect.move(250, 0)
+        self.nameinput.rect.center = self.bg.rect.center
+        self.bg.dirty = 1
 
 class FreeplayMenu(Scene):
     pass
@@ -709,7 +855,7 @@ if __name__ == '__main__':
     s4 = Ship((15, 1), 'essex.png', board_group, ship_group)
     s5 = Ship((20, 0), 'essex.png', board_group, ship_group)
 
-    firegrid = FiringGrid((30, 30), ShotStyle.CLASSIC, ship_group, board_group)
+    firegrid = FiringGrid((30, 30), ShotStyle.CLEAN, ship_group, board_group)
     print(firegrid.shoot((0, 0)))
     print(firegrid.shoot((1, 1)))
 
