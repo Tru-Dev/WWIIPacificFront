@@ -11,7 +11,7 @@ from math import copysign
 from enum import IntFlag, auto
 import re
 
-import numpy as np
+# import numpy as np
 import pygame
 import pygame.sprite
 import pygame.image
@@ -22,8 +22,8 @@ import pygame.transform
 import pygame.time
 import pygame.event
 import pygame.key
-import pygame.surfarray
 import pygame.freetype
+# import pygame.surfarray
 
 TILE_SIZE: Final[int] = 64
 
@@ -297,33 +297,35 @@ class Crosshair(pygame.sprite.DirtySprite):
     def update(self):
         self.rect.center = pygame.mouse.get_pos()
 
-class InvertCrosshair:
-    def __init__(self, mask_file: str, img_file: str) -> None:
-        mask = pygame.image.load(Path(__file__).parent.parent / 'assets' / 'img' / mask_file)
-        self.image = pygame.image.load(Path(__file__).parent.parent / 'assets' / 'img' / img_file)
-        self.image.set_colorkey(pygame.Color('White'))
-        self.rect = self.image.get_rect()
-        self.truth_arr = np.array(pygame.surfarray.pixels2d(mask) & 0xFFFFFF, dtype=bool)
-        self.dirty = 1
+# InvertCrosshair: Requires Numpy.
+
+# class InvertCrosshair:
+#     def __init__(self, mask_file: str, img_file: str) -> None:
+#         mask = pygame.image.load(Path(__file__).parent.parent / 'assets' / 'img' / mask_file)
+#         self.image = pygame.image.load(Path(__file__).parent.parent / 'assets' / 'img' / img_file)
+#         self.image.set_colorkey(pygame.Color('White'))
+#         self.rect = self.image.get_rect()
+#         self.truth_arr = np.array(pygame.surfarray.pixels2d(mask) & 0xFFFFFF, dtype=bool)
+#         self.dirty = 1
         
-    def draw(self, surf: pygame.Surface) -> List[pygame.Rect]:
-        if self.dirty == 0:
-            return []
-        elif self.dirty == 1:
-            self.dirty = 0
-        self.rect.center = pygame.mouse.get_pos()
-        self.rect.clamp_ip(surf.get_rect())
-        surfarr = pygame.surfarray.pixels3d(surf.subsurface(self.rect))
+#     def draw(self, surf: pygame.Surface) -> List[pygame.Rect]:
+#         if self.dirty == 0:
+#             return []
+#         elif self.dirty == 1:
+#             self.dirty = 0
+#         self.rect.center = pygame.mouse.get_pos()
+#         self.rect.clamp_ip(surf.get_rect())
+#         surfarr = pygame.surfarray.pixels3d(surf.subsurface(self.rect))
 
-        intermediate_array: np.ndarray = np.array(
-            np.average(surfarr[self.truth_arr], 1) // 128, dtype=np.int8
-        ).reshape((-1, 1)) * 255
+#         intermediate_array: np.ndarray = np.array(
+#             np.average(surfarr[self.truth_arr], 1) // 128, dtype=np.int8
+#         ).reshape((-1, 1)) * 255
 
-        surfarr[self.truth_arr] = np.concatenate((intermediate_array, ) * 3, axis=1)
-        del surfarr
+#         surfarr[self.truth_arr] = np.concatenate((intermediate_array, ) * 3, axis=1)
+#         del surfarr
 
-        surf.blit(self.image, self.rect)
-        return [self.rect]
+#         surf.blit(self.image, self.rect)
+#         return [self.rect]
 
 class SnapCrosshair(pygame.sprite.DirtySprite):
     def __init__(self, color: pygame.Color, *groups: pygame.sprite.AbstractGroup) -> None:

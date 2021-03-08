@@ -1,0 +1,8 @@
+[music_sounds]
+music_volume = 100
+sound_volume = 100
+track = 1
+
+[game]
+shot_style = 3
+name = ''
