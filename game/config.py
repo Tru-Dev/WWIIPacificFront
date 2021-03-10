@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Optional
+from typing import Any, ClassVar, Dict, Optional, Type
 
 import toml
 
@@ -8,8 +8,10 @@ class Config:
     default_config: ClassVar[Optional[Dict[str, Any]]] = None
     default_filename: ClassVar[Optional[str]] = None
 
-    def __init__(self, cfg_file: Optional[str] = None) -> None:
-        self.cfg_file = cfg_file if cfg_file is not None else None
+    def __init__(self, cfg_file: Optional[str]=None) -> None:
+        self.cfg_file = cfg_file if cfg_file is not None else type(self).default_filename
+        if self.cfg_file is None or self.cfg_file == '':
+            self.cfg_file = type(self).__name__ + '.toml'
         self._full_path = Path(__file__).parent.parent / cfg_file
         self._file_obj = open(self._full_path, mode='r+')
         self._config = toml.load(self._file_obj)
@@ -33,6 +35,14 @@ class Config:
 
     def full(self):
         return self._config.copy()
+
+    @classmethod
+    def subclass_factory(
+        cls,
+        name: str,
+        dconf: Optional[Dict[str, Any]]=None
+    ) -> Type['Config']:
+        pass
 
 class GameOptions(Config):
     default_config = {
